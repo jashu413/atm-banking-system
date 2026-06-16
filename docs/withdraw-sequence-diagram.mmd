@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor Customer
+    participant ATM
+    participant AuthenticationService
+    participant ATMService
+    participant BankAccount
+    participant Transaction
+
+    Customer->>ATM: Enter account number and PIN
+    ATM->>AuthenticationService: login(accountNumber, pin)
+    AuthenticationService-->>ATM: Optional<Customer>
+    Customer->>ATM: Select Withdraw and enter amount
+    ATM->>ATMService: withdraw(customer, amount)
+    ATMService->>BankAccount: withdraw(amount)
+    BankAccount->>BankAccount: validate positive amount
+    BankAccount->>BankAccount: check daily withdrawal limit
+    BankAccount->>BankAccount: check available balance
+    alt Valid withdrawal
+        BankAccount->>BankAccount: subtract amount from balance
+        BankAccount->>Transaction: create WITHDRAWAL transaction with date/time
+        BankAccount-->>ATMService: success
+        ATMService-->>ATM: success
+        ATM-->>Customer: Show success message
+    else Invalid withdrawal
+        BankAccount-->>ATMService: throw ATMException
+        ATMService-->>ATM: exception
+        ATM-->>Customer: Show error message
+    end

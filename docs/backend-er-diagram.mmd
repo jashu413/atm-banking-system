@@ -1,0 +1,43 @@
+%% Backend JPA entity-relationship diagram (Phase 1).
+%% Relationships are unchanged from the console design; only persistence mapping was added.
+%%   - CUSTOMERS 1:1 ACCOUNTS  (FK customer_id on accounts, unique)
+%%   - ACCOUNTS  1:N TRANSACTIONS (FK account_id on transactions)
+%%   - SavingsAccount / CurrentAccount share ACCOUNTS via single-table inheritance
+%%     (discriminator column account_type = SAVINGS | CURRENT)
+erDiagram
+    CUSTOMERS ||--|| ACCOUNTS : "owns"
+    ACCOUNTS  ||--o{ TRANSACTIONS : "records"
+
+    CUSTOMERS {
+        bigint   id PK
+        string   customer_code UK
+        string   name
+        string   email
+        string   phone
+        datetime created_at
+    }
+
+    ACCOUNTS {
+        bigint   id PK
+        string   account_number UK
+        string   account_type "discriminator: SAVINGS | CURRENT"
+        string   pin "plaintext in Phase 1; BCrypt in Phase 3"
+        decimal  balance "DECIMAL(19,2)"
+        decimal  daily_withdrawal_limit "DECIMAL(19,2)"
+        boolean  locked
+        bigint   version "optimistic lock"
+        bigint   customer_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    TRANSACTIONS {
+        bigint   id PK
+        bigint   account_id FK
+        string   type "DEPOSIT | WITHDRAWAL | TRANSFER_IN | TRANSFER_OUT | PIN_CHANGE"
+        decimal  amount "DECIMAL(19,2)"
+        decimal  balance_after "DECIMAL(19,2)"
+        string   description
+        string   related_account "transfer counterparty; null otherwise"
+        datetime created_at
+    }

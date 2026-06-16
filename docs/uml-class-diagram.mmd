@@ -1,0 +1,88 @@
+classDiagram
+    class ATM {
+        -Scanner scanner
+        -AuthenticationService authenticationService
+        -ATMService atmService
+        +main(String[] args) void
+        +start() void
+    }
+
+    class Customer {
+        -String customerId
+        -String name
+        -BankAccount account
+        +getCustomerId() String
+        +getName() String
+        +getAccount() BankAccount
+    }
+
+    class BankAccount {
+        <<abstract>>
+        -String accountNumber
+        -String pin
+        -BigDecimal balance
+        -BigDecimal dailyWithdrawalLimit
+        -List~Transaction~ transactions
+        +getAccountType() String*
+        +deposit(BigDecimal amount) void
+        +withdraw(BigDecimal amount) void
+        +debitForTransfer(BigDecimal amount, String targetAccountNumber) void
+        +creditFromTransfer(BigDecimal amount, String sourceAccountNumber) void
+        +changePin(String newPin) void
+        +getMiniStatement(int count) List~Transaction~
+    }
+
+    class SavingsAccount {
+        +getAccountType() String
+    }
+
+    class CurrentAccount {
+        +getAccountType() String
+    }
+
+    class Transaction {
+        -TransactionType type
+        -BigDecimal amount
+        -LocalDateTime dateTime
+        -String description
+        -BigDecimal balanceAfterTransaction
+        +toString() String
+    }
+
+    class TransactionType {
+        <<enumeration>>
+        DEPOSIT
+        WITHDRAWAL
+        TRANSFER_IN
+        TRANSFER_OUT
+        PIN_CHANGE
+    }
+
+    class AuthenticationService {
+        -Map~String, Customer~ customersByAccountNumber
+        -Map~String, Integer~ failedAttemptsByAccountNumber
+        +login(String accountNumber, String pin) Optional~Customer~
+        +isAdminLogin(String username, String pin) boolean
+    }
+
+    class ATMService {
+        -Map~String, Customer~ customersByAccountNumber
+        +checkBalance(Customer customer) BigDecimal
+        +deposit(Customer customer, BigDecimal amount) void
+        +withdraw(Customer customer, BigDecimal amount) void
+        +transfer(Customer sourceCustomer, String targetAccountNumber, BigDecimal amount) void
+        +getTransactionHistory(Customer customer) List~Transaction~
+        +getMiniStatement(Customer customer) List~Transaction~
+        +changePin(Customer customer, String newPin) void
+        +getAllCustomers() List~Customer~
+    }
+
+    BankAccount <|-- SavingsAccount
+    BankAccount <|-- CurrentAccount
+    Customer *-- BankAccount
+    BankAccount *-- Transaction
+    Transaction --> TransactionType
+    ATM --> AuthenticationService
+    ATM --> ATMService
+    ATMService --> Customer
+    AuthenticationService --> Customer

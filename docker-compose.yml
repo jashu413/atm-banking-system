@@ -1,0 +1,25 @@
+# Phase 0: MySQL only. The backend, Redis, and frontend services are added in later phases
+# (see docs/migration-plan.md). Start the database with:  docker compose up -d
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: banking-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: banking_db
+      MYSQL_USER: banking
+      MYSQL_PASSWORD: banking
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql_data:

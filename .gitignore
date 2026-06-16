@@ -1,0 +1,21 @@
+# Build output
+target/
+build/
+dist/
+
+# Node / frontend (added in Phase 5)
+node_modules/
+frontend/dist/
+
+# Environment
+.env
+*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
