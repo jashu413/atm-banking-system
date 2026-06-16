@@ -20,7 +20,7 @@ ATM/
 | Module | Status | Description |
 |---|---|---|
 | [atm-console](atm-console/) | ✅ Complete | In-memory menu-driven console ATM. See its [README](atm-console/README.md). |
-| [backend](backend/) | 🚧 Phase 0 scaffolded | Spring Boot 3.x + Spring Security + JPA + MySQL REST API. |
+| [backend](backend/) | 🚧 Phase 2 (core services) | Spring Boot 3.x + Spring Security + JPA + MySQL REST API. |
 | frontend | 📋 Planned | React + Vite + TypeScript SPA. |
 
 ## Target stack
@@ -53,8 +53,17 @@ Once running:
 
 ## Current state
 
-Phase 0 (foundation) is complete: the backend module is scaffolded with the full package
-structure, dependencies, configuration, Docker Compose for MySQL, and the Maven Wrapper.
-**No domain logic has been migrated yet** — that begins in Phase 1.
+Phases 0–2 are complete:
 
-See [docs/migration-plan.md](docs/migration-plan.md) for the full roadmap.
+- **Phase 0 — Foundation:** backend scaffolded (package structure, dependencies, config,
+  Docker Compose for MySQL, Maven Wrapper).
+- **Phase 1 — Domain & persistence:** JPA entities (`BankAccount` hierarchy, `Customer`,
+  `Transaction`), repositories, demo-data seeder, and `@DataJpaTest` persistence tests.
+- **Phase 2 — Core banking services:** `AccountService` (balance, deposit, withdraw,
+  change-PIN), `TransferService` (atomic debit+credit under a pessimistic lock, with
+  deterministic lock ordering to avoid deadlock), and `TransactionService` (history,
+  mini-statement) — all transactional, with Mockito unit tests.
+
+**Not yet built:** REST controllers/DTOs, security & JWT (Phase 3), the REST API layer
+(Phase 4), and the React frontend (Phase 5). See
+[docs/migration-plan.md](docs/migration-plan.md) for the full roadmap.
