@@ -2,7 +2,6 @@ package com.bank.domain;
 
 import com.bank.exception.InsufficientFundsException;
 import com.bank.exception.InvalidAmountException;
-import com.bank.exception.InvalidPinException;
 import com.bank.exception.WithdrawalLimitExceededException;
 import org.junit.jupiter.api.Test;
 
@@ -59,19 +58,14 @@ class BankAccountTest {
     }
 
     @Test
-    void pinMustHaveExactlyFourDigits() {
+    void changePinStoresTheGivenHashAndRecordsTheChange() {
         BankAccount account = newAccount("100.00", "500.00");
 
-        assertThrows(InvalidPinException.class, () -> account.changePin("12345"));
-    }
+        // The domain treats the PIN as an opaque hash; format validation and hashing live in
+        // the service layer (see PinPolicyTest / AccountServiceTest).
+        account.changePin("$2a$10$newlyHashedPinValue");
 
-    @Test
-    void changePinSucceedsAndIsRecorded() {
-        BankAccount account = newAccount("100.00", "500.00");
-
-        account.changePin("9999");
-
-        assertThat(account.pinMatches("9999")).isTrue();
+        assertThat(account.getPinHash()).isEqualTo("$2a$10$newlyHashedPinValue");
         assertThat(account.getTransactions()).hasSize(1);
         assertThat(account.getTransactions().get(0).getType()).isEqualTo(TransactionType.PIN_CHANGE);
     }

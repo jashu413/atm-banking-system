@@ -6,6 +6,8 @@ import com.bank.exception.AccountNotFoundException;
 import com.bank.exception.InvalidPinException;
 import com.bank.exception.InvalidTransferException;
 import com.bank.repository.AccountRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +26,14 @@ import java.math.BigDecimal;
 public class TransferService {
 
     private final AccountRepository accountRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public TransferService(AccountRepository accountRepository) {
+    public TransferService(AccountRepository accountRepository, PasswordEncoder passwordEncoder) {
         this.accountRepository = accountRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @PreAuthorize("hasRole('CUSTOMER')")
     @Transactional
     public void transfer(String sourceAccountNumber, String targetAccountNumber,
                          String pin, BigDecimal amount) {
@@ -72,8 +77,8 @@ public class TransferService {
         }
     }
 
-    private void verifyPin(BankAccount account, String pin) {
-        if (!account.pinMatches(pin)) {
+    private void verifyPin(BankAccount account, String rawPin) {
+        if (!passwordEncoder.matches(rawPin, account.getPinHash())) {
             throw new InvalidPinException("Incorrect PIN.");
         }
     }

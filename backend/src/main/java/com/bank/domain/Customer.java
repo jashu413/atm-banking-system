@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
@@ -44,6 +45,15 @@ public class Customer {
             fetch = FetchType.LAZY, optional = false)
     private BankAccount account;
 
+    /**
+     * The login identity for this customer (Phase 3). Optional at the persistence level so that
+     * customer/account fixtures can be built without a user, but populated for every real customer
+     * by registration and the demo seeder. {@code Customer} cascades persistence to its user.
+     */
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)
+    private UserAccount user;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -61,6 +71,15 @@ public class Customer {
     public void assignAccount(BankAccount account) {
         this.account = account;
         account.setCustomer(this);
+    }
+
+    /** Attaches the login identity for this customer. */
+    public void assignUser(UserAccount user) {
+        this.user = user;
+    }
+
+    public UserAccount getUser() {
+        return user;
     }
 
     public Long getId() {

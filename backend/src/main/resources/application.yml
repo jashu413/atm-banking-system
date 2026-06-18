@@ -28,6 +28,9 @@ server:
 app:
   # Seeds demo customers on startup (see DataSeeder). Disabled in the test profile.
   seed-demo-data: true
+  security:
+    # Lock a user account after this many consecutive failed logins (ported console policy).
+    max-failed-login-attempts: ${MAX_FAILED_LOGIN_ATTEMPTS:3}
   jwt:
     # Override in real environments via the JWT_SECRET env var. Base64-encoded, >= 256 bits.
     secret: ${JWT_SECRET:Y2hhbmdlLW1lLXRoaXMtaXMtYS1kZXYtb25seS1zZWNyZXQta2V5LTEyMzQ1Ng==}

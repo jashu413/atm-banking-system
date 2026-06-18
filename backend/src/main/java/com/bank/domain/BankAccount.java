@@ -2,7 +2,6 @@ package com.bank.domain;
 
 import com.bank.exception.InsufficientFundsException;
 import com.bank.exception.InvalidAmountException;
-import com.bank.exception.InvalidPinException;
 import com.bank.exception.WithdrawalLimitExceededException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -42,7 +41,10 @@ import java.util.List;
  *       rather than a stored counter (no per-day reset needed).</li>
  *   <li>{@code synchronized} was dropped in favour of DB transactions and {@code @Version}
  *       optimistic locking (enforced by the Phase 2 service layer).</li>
- *   <li>The PIN is stored in plaintext in Phase 1; BCrypt hashing arrives in Phase 3.</li>
+ *   <li>As of Phase 3 the transaction PIN is stored as an opaque BCrypt hash ({@code pin_hash});
+ *       the domain treats it as a string and never compares it. Raw-PIN format validation lives
+ *       in {@code PinPolicy}, and hashing/verification is performed by the service layer via a
+ *       {@code PasswordEncoder}.</li>
  * </ul>
  */
 @Entity
@@ -58,8 +60,8 @@ public abstract class BankAccount {
     @Column(name = "account_number", nullable = false, unique = true, length = 20)
     private String accountNumber;
 
-    @Column(nullable = false, length = 100)
-    private String pin;
+    @Column(name = "pin_hash", nullable = false, length = 100)
+    private String pinHash;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance;
@@ -93,13 +95,12 @@ public abstract class BankAccount {
         // for JPA
     }
 
-    protected BankAccount(String accountNumber, String pin, BigDecimal openingBalance,
+    protected BankAccount(String accountNumber, String pinHash, BigDecimal openingBalance,
                           BigDecimal dailyWithdrawalLimit) {
-        validatePin(pin);
         validateNonNegative(openingBalance, "Opening balance cannot be negative.");
         validatePositive(dailyWithdrawalLimit, "Daily withdrawal limit must be positive.");
         this.accountNumber = accountNumber;
-        this.pin = pin;
+        this.pinHash = pinHash;
         this.balance = openingBalance;
         this.dailyWithdrawalLimit = dailyWithdrawalLimit;
     }
@@ -159,13 +160,20 @@ public abstract class BankAccount {
 
     // --- Behaviour (preserved from the console application) ---
 
-    public boolean pinMatches(String enteredPin) {
-        return pin.equals(enteredPin);
+    /**
+     * The stored BCrypt PIN hash. Verification is the service layer's responsibility (via a
+     * {@code PasswordEncoder}); the domain never compares the PIN itself.
+     */
+    public String getPinHash() {
+        return pinHash;
     }
 
-    public void changePin(String newPin) {
-        validatePin(newPin);
-        this.pin = newPin;
+    /**
+     * Replaces the PIN with an already-hashed value and records the change in the ledger. The
+     * caller is responsible for validating the raw PIN's format and hashing it.
+     */
+    public void changePin(String newPinHash) {
+        this.pinHash = newPinHash;
         addTransaction(TransactionType.PIN_CHANGE, BigDecimal.ZERO, "PIN changed successfully.", null);
     }
 
@@ -234,12 +242,6 @@ public abstract class BankAccount {
     }
 
     // --- Validation (preserved from the console application) ---
-
-    private static void validatePin(String pin) {
-        if (pin == null || !pin.matches("\\d{4}")) {
-            throw new InvalidPinException("PIN must be exactly 4 digits.");
-        }
-    }
 
     private static void validatePositive(BigDecimal amount, String message) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
