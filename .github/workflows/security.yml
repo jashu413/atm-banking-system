@@ -23,7 +23,7 @@ jobs:
         run: docker build -t banking-backend:scan ./backend
 
       - name: Scan backend image (CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.23.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: banking-backend:scan
           format: table
@@ -35,7 +35,7 @@ jobs:
         run: docker build -t banking-frontend:scan ./frontend
 
       - name: Scan frontend image (CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.23.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: banking-frontend:scan
           format: table
@@ -44,7 +44,7 @@ jobs:
 
       # ── Filesystem / dependency scan ───────────────────────────────────────
       - name: Scan repository filesystem
-        uses: aquasecurity/trivy-action@0.23.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: fs
           scan-ref: .
