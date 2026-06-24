@@ -23,31 +23,34 @@ jobs:
         run: docker build -t banking-backend:scan ./backend
 
       - name: Scan backend image (CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: banking-backend:scan
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          exit-code: '1'
 
       # ── Frontend image ─────────────────────────────────────────────────────
       - name: Build frontend image
         run: docker build -t banking-frontend:scan ./frontend
 
       - name: Scan frontend image (CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: banking-frontend:scan
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          exit-code: '1'
 
       # ── Filesystem / dependency scan ───────────────────────────────────────
       - name: Scan repository filesystem
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: .
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          exit-code: '1'
