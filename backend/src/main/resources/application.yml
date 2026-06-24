@@ -10,32 +10,74 @@ spring:
 
   jpa:
     hibernate:
-      # Phase 0 decision: schema is derived from JPA entities via ddl-auto.
-      # 'update' is for development only and is NOT production-safe
-      # (see docs/migration-plan.md → Risks and assumptions).
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+
+  flyway:
+    # baseline-on-migrate: if the schema already has tables from ddl-auto:update (pre-Flyway)
+    # but no flyway_schema_history table, mark V1 as already applied and continue.
+    # On a fresh empty database, V1 always runs normally.
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 server:
   port: ${SERVER_PORT:8080}
 
-# Application-specific settings (consumed once the security layer lands in Phase 3).
+# Spring Boot Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    redis:
+      # Only check Redis health when Redis rate limiting is active.
+      enabled: ${app.security.rate-limit.redis-enabled:false}
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ATM Banking System
+    version: 1.0.0
+
+# Application-specific settings
 app:
-  # Seeds demo customers on startup (see DataSeeder). Disabled in the test profile.
-  seed-demo-data: true
+  seed-demo-data: ${SEED_DEMO_DATA:true}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
   security:
-    # Lock a user account after this many consecutive failed logins (ported console policy).
     max-failed-login-attempts: ${MAX_FAILED_LOGIN_ATTEMPTS:3}
+    rate-limit:
+      ip-max-attempts: ${RATE_LIMIT_IP_MAX:20}
+      ip-window-seconds: ${RATE_LIMIT_IP_WINDOW:60}
+      username-max-attempts: ${RATE_LIMIT_USER_MAX:10}
+      username-window-seconds: ${RATE_LIMIT_USER_WINDOW:900}
+      redis-enabled: ${REDIS_RATE_LIMIT_ENABLED:false}
   jwt:
-    # Override in real environments via the JWT_SECRET env var. Base64-encoded, >= 256 bits.
     secret: ${JWT_SECRET:Y2hhbmdlLW1lLXRoaXMtaXMtYS1kZXYtb25seS1zZWNyZXQta2V5LTEyMzQ1Ng==}
-    access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}      # 15 minutes
-    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
+    access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
 
 # Swagger / OpenAPI (springdoc)
 springdoc:
@@ -44,7 +86,3 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
-
-logging:
-  level:
-    org.hibernate.SQL: debug

@@ -1,0 +1,24 @@
+# ── Development profile ───────────────────────────────────────────────────────
+# Activate with: SPRING_PROFILES_ACTIVE=dev  (or set in IDE run config)
+# Uses local MySQL, shows SQL, enables Swagger, seeds demo data.
+
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  seed-demo-data: true
+  base-url: http://localhost:5173
+  security:
+    max-failed-login-attempts: 5   # more lenient in dev
+    rate-limit:
+      ip-max-attempts: 100          # effectively disabled in dev
+      username-max-attempts: 50
+
+logging:
+  level:
+    com.bank: debug
+    org.hibernate.SQL: debug

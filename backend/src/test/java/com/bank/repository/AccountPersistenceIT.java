@@ -66,7 +66,7 @@ class AccountPersistenceIT {
 
         BankAccount account = accountRepository.findByAccountNumber("1001001001").orElseThrow();
         account.deposit(new BigDecimal("500.00"));
-        account.withdraw(new BigDecimal("200.00"));
+        account.withdraw(new BigDecimal("200.00"), BigDecimal.ZERO);
         accountRepository.saveAndFlush(account);
         em.clear();
 

@@ -41,6 +41,12 @@ public class UserAccount {
     @Column(nullable = false, length = 20)
     private Role role;
 
+    @Column(length = 120)
+    private String email;
+
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -92,6 +98,14 @@ public class UserAccount {
     }
 
     // --- Accessors ---
+
+    public String getEmail() { return email; }
+
+    public void setEmail(String email) { this.email = email; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+
+    public void markEmailVerified() { this.emailVerified = true; }
 
     public Long getId() {
         return id;

@@ -12,9 +12,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Pure unit tests for the domain rules (no persistence). Ported from the console
- * application's {@code BankAccountTest}, with extra coverage for the mini statement and
- * the transfer primitives.
+ * Pure unit tests for the domain rules (no persistence). The daily withdrawal sum is now passed
+ * as a parameter (computed via SQL aggregate in the service layer) rather than being computed from
+ * the in-memory transaction collection.
  */
 class BankAccountTest {
 
@@ -44,25 +44,25 @@ class BankAccountTest {
     void withdrawalFailsWhenBalanceIsInsufficient() {
         BankAccount account = newAccount("100.00", "500.00");
 
-        assertThrows(InsufficientFundsException.class, () -> account.withdraw(new BigDecimal("150.00")));
+        assertThrows(InsufficientFundsException.class,
+                () -> account.withdraw(new BigDecimal("150.00"), BigDecimal.ZERO));
     }
 
     @Test
     void withdrawalFailsWhenDailyLimitIsExceeded() {
+        // limit = 500.00; already withdrawn 300.00 today; next 250.00 would exceed
         BankAccount account = newAccount("1000.00", "500.00");
 
-        account.withdraw(new BigDecimal("300.00"));
+        account.withdraw(new BigDecimal("300.00"), BigDecimal.ZERO);
 
         assertThrows(WithdrawalLimitExceededException.class,
-                () -> account.withdraw(new BigDecimal("250.00")));
+                () -> account.withdraw(new BigDecimal("250.00"), new BigDecimal("300.00")));
     }
 
     @Test
     void changePinStoresTheGivenHashAndRecordsTheChange() {
         BankAccount account = newAccount("100.00", "500.00");
 
-        // The domain treats the PIN as an opaque hash; format validation and hashing live in
-        // the service layer (see PinPolicyTest / AccountServiceTest).
         account.changePin("$2a$10$newlyHashedPinValue");
 
         assertThat(account.getPinHash()).isEqualTo("$2a$10$newlyHashedPinValue");
@@ -87,8 +87,10 @@ class BankAccountTest {
 
     @Test
     void transferPrimitivesMoveMoneyAndRecordBothSides() {
-        BankAccount source = new SavingsAccount("1001", "1234", new BigDecimal("1000.00"), new BigDecimal("5000.00"));
-        BankAccount target = new CurrentAccount("2002", "2345", new BigDecimal("500.00"), new BigDecimal("5000.00"));
+        BankAccount source = new SavingsAccount("1001", "1234",
+                new BigDecimal("1000.00"), new BigDecimal("5000.00"));
+        BankAccount target = new CurrentAccount("2002", "2345",
+                new BigDecimal("500.00"), new BigDecimal("5000.00"));
 
         source.debitForTransfer(new BigDecimal("200.00"), target.getAccountNumber());
         target.creditFromTransfer(new BigDecimal("200.00"), source.getAccountNumber());

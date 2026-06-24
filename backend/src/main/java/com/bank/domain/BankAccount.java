@@ -24,7 +24,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,13 +117,6 @@ public abstract class BankAccount {
         return accountNumber;
     }
 
-    public String getMaskedAccountNumber() {
-        if (accountNumber.length() <= 4) {
-            return accountNumber;
-        }
-        return "****" + accountNumber.substring(accountNumber.length() - 4);
-    }
-
     public BigDecimal getBalance() {
         return balance;
     }
@@ -181,16 +173,24 @@ public abstract class BankAccount {
         this.locked = true;
     }
 
+    public void unlock() {
+        this.locked = false;
+    }
+
     public void deposit(BigDecimal amount) {
         validatePositive(amount, "Deposit amount must be positive.");
         balance = balance.add(amount);
         addTransaction(TransactionType.DEPOSIT, amount, "Cash deposit.", null);
     }
 
-    public void withdraw(BigDecimal amount) {
+    /**
+     * Withdraws cash. The daily total already withdrawn today is supplied by the caller (computed
+     * via a SQL aggregate in the service layer) so this method never touches the transaction
+     * collection — eliminating the full-collection load that the in-memory version required.
+     */
+    public void withdraw(BigDecimal amount, BigDecimal withdrawnTodaySoFar) {
         validatePositive(amount, "Withdrawal amount must be positive.");
-        // Daily limit is derived from today's withdrawals rather than a stored counter.
-        if (totalWithdrawnToday().add(amount).compareTo(dailyWithdrawalLimit) > 0) {
+        if (withdrawnTodaySoFar.add(amount).compareTo(dailyWithdrawalLimit) > 0) {
             throw new WithdrawalLimitExceededException(
                     "Daily withdrawal limit exceeded. Limit: $" + dailyWithdrawalLimit);
         }
@@ -230,15 +230,6 @@ public abstract class BankAccount {
     private void addTransaction(TransactionType type, BigDecimal amount, String description,
                                 String relatedAccount) {
         transactions.add(new Transaction(this, type, amount, balance, description, relatedAccount));
-    }
-
-    private BigDecimal totalWithdrawnToday() {
-        LocalDate today = LocalDate.now();
-        return transactions.stream()
-                .filter(t -> t.getType() == TransactionType.WITHDRAWAL)
-                .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().toLocalDate().equals(today))
-                .map(Transaction::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     // --- Validation (preserved from the console application) ---

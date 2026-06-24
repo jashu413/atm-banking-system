@@ -30,31 +30,37 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link TransferService}. Both accounts are real domain objects returned by a
- * mocked repository under the pessimistic-lock lookup; a real {@link BCryptPasswordEncoder} backs
- * PIN verification. Tests cover atomic money movement, both ledger legs, and the guard conditions.
+ * Unit tests for {@link TransferService}. The source account is loaded through the
+ * ownership-enforcing {@code findByAccountNumberAndOwnerForUpdate}; the target uses the plain
+ * pessimistic-lock query. Both are mocked with a fixed username so no Spring Security context is
+ * needed.
  */
 @ExtendWith(MockitoExtension.class)
 class TransferServiceTest {
 
     private static final String SOURCE = "1001001001";
     private static final String TARGET = "1001001002";
+    private static final String USERNAME = "asha";
     private static final String SOURCE_PIN = "1234";
 
     @Mock
     private AccountRepository accountRepository;
+    @Mock
+    private AuditService auditService;
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private TransferService transferService;
 
     @BeforeEach
     void setUp() {
-        transferService = new TransferService(accountRepository, passwordEncoder);
+        transferService = new TransferService(accountRepository, passwordEncoder, auditService);
     }
 
     private void givenAccounts(BankAccount source, BankAccount target) {
-        lenient().when(accountRepository.findByAccountNumberForUpdate(SOURCE))
+        // Source: ownership-enforced pessimistic lock (SOURCE < TARGET lexicographically → locked first)
+        lenient().when(accountRepository.findByAccountNumberAndOwnerForUpdate(SOURCE, USERNAME))
                 .thenReturn(Optional.of(source));
+        // Target: plain pessimistic lock (no ownership restriction)
         lenient().when(accountRepository.findByAccountNumberForUpdate(TARGET))
                 .thenReturn(Optional.of(target));
     }
@@ -75,7 +81,7 @@ class TransferServiceTest {
         BankAccount target = current(TARGET, "500.00");
         givenAccounts(source, target);
 
-        transferService.transfer(SOURCE, TARGET, SOURCE_PIN, new BigDecimal("300.00"));
+        transferService.transfer(SOURCE, TARGET, USERNAME, SOURCE_PIN, new BigDecimal("300.00"));
 
         assertThat(source.getBalance()).isEqualByComparingTo("700.00");
         assertThat(target.getBalance()).isEqualByComparingTo("800.00");
@@ -87,7 +93,8 @@ class TransferServiceTest {
 
     @Test
     void transferToSameAccountIsRejected() {
-        assertThatThrownBy(() -> transferService.transfer(SOURCE, SOURCE, SOURCE_PIN, new BigDecimal("10.00")))
+        assertThatThrownBy(() ->
+                transferService.transfer(SOURCE, SOURCE, USERNAME, SOURCE_PIN, new BigDecimal("10.00")))
                 .isInstanceOf(InvalidTransferException.class);
         verify(accountRepository, never()).save(any());
     }
@@ -98,7 +105,8 @@ class TransferServiceTest {
         BankAccount target = current(TARGET, "500.00");
         givenAccounts(source, target);
 
-        assertThatThrownBy(() -> transferService.transfer(SOURCE, TARGET, SOURCE_PIN, new BigDecimal("300.00")))
+        assertThatThrownBy(() ->
+                transferService.transfer(SOURCE, TARGET, USERNAME, SOURCE_PIN, new BigDecimal("300.00")))
                 .isInstanceOf(InsufficientFundsException.class);
 
         assertThat(source.getBalance()).isEqualByComparingTo("100.00");
@@ -111,7 +119,8 @@ class TransferServiceTest {
         BankAccount target = current(TARGET, "500.00");
         givenAccounts(source, target);
 
-        assertThatThrownBy(() -> transferService.transfer(SOURCE, TARGET, "0000", new BigDecimal("100.00")))
+        assertThatThrownBy(() ->
+                transferService.transfer(SOURCE, TARGET, USERNAME, "0000", new BigDecimal("100.00")))
                 .isInstanceOf(InvalidPinException.class);
         verify(accountRepository, never()).save(any());
     }
@@ -123,17 +132,20 @@ class TransferServiceTest {
         BankAccount target = current(TARGET, "500.00");
         givenAccounts(source, target);
 
-        assertThatThrownBy(() -> transferService.transfer(SOURCE, TARGET, SOURCE_PIN, new BigDecimal("100.00")))
+        assertThatThrownBy(() ->
+                transferService.transfer(SOURCE, TARGET, USERNAME, SOURCE_PIN, new BigDecimal("100.00")))
                 .isInstanceOf(AccountLockedException.class);
     }
 
     @Test
     void transferToMissingTargetThrowsNotFound() {
         BankAccount source = savings(SOURCE, "1000.00");
-        when(accountRepository.findByAccountNumberForUpdate(SOURCE)).thenReturn(Optional.of(source));
+        when(accountRepository.findByAccountNumberAndOwnerForUpdate(SOURCE, USERNAME))
+                .thenReturn(Optional.of(source));
         when(accountRepository.findByAccountNumberForUpdate(TARGET)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> transferService.transfer(SOURCE, TARGET, SOURCE_PIN, new BigDecimal("100.00")))
+        assertThatThrownBy(() ->
+                transferService.transfer(SOURCE, TARGET, USERNAME, SOURCE_PIN, new BigDecimal("100.00")))
                 .isInstanceOf(AccountNotFoundException.class);
     }
 }

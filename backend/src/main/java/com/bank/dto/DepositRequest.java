@@ -6,9 +6,8 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
-/** Request body for a deposit. */
+/** Request body for a deposit. The target account number is supplied as a path variable. */
 public record DepositRequest(
-        @NotNull Long accountId,
         @NotNull @Positive @Digits(integer = 17, fraction = 2) BigDecimal amount
 ) {
 }

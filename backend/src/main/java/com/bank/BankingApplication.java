@@ -2,15 +2,11 @@ package com.bank;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
-/**
- * Entry point for the full stack banking application backend.
- *
- * <p>Phase 0 scaffolding only: the package structure defined in
- * {@code docs/migration-plan.md} is in place, but no domain logic has been
- * migrated from the console application yet.
- */
+/** Entry point for the ATM Banking System backend. */
 @SpringBootApplication
+@EnableScheduling
 public class BankingApplication {
 
     public static void main(String[] args) {

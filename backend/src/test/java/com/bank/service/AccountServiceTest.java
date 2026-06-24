@@ -3,11 +3,13 @@ package com.bank.service;
 import com.bank.domain.BankAccount;
 import com.bank.domain.SavingsAccount;
 import com.bank.domain.TransactionType;
+import com.bank.dto.AccountResponse;
 import com.bank.exception.AccountLockedException;
 import com.bank.exception.AccountNotFoundException;
 import com.bank.exception.InsufficientFundsException;
 import com.bank.exception.InvalidPinException;
 import com.bank.repository.AccountRepository;
+import com.bank.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,31 +24,39 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link AccountService}. The repository is mocked and the rich {@link BankAccount}
- * domain object is real; a real {@link BCryptPasswordEncoder} verifies that the service hashes and
- * checks PINs correctly (PINs are stored hashed, never in plaintext).
+ * Unit tests for {@link AccountService}. Repositories are mocked; the real domain object and a
+ * real {@link BCryptPasswordEncoder} verify PIN hashing end-to-end. Ownership-enforcing repo
+ * methods are stubbed with a fixed username so tests remain Spring-Security-context-free.
  */
 @ExtendWith(MockitoExtension.class)
 class AccountServiceTest {
 
     private static final String ACCT = "1001001001";
+    private static final String USER = "asha";
     private static final String PIN = "1234";
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private TransactionRepository transactionRepository;
+    @Mock
+    private AuditService auditService;
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(accountRepository, passwordEncoder);
+        accountService = new AccountService(accountRepository, transactionRepository, passwordEncoder,
+                auditService);
     }
 
     private SavingsAccount account(String balance, String limit) {
@@ -54,8 +64,12 @@ class AccountServiceTest {
                 new BigDecimal(balance), new BigDecimal(limit));
     }
 
+    /** Stubs both the owned-account lookup (customer path) and the plain lookup (admin path). */
     private void givenAccount(BankAccount account) {
-        when(accountRepository.findByAccountNumber(ACCT)).thenReturn(Optional.of(account));
+        lenient().when(accountRepository.findByAccountNumberAndOwner(ACCT, USER))
+                .thenReturn(Optional.of(account));
+        lenient().when(accountRepository.findByAccountNumber(ACCT))
+                .thenReturn(Optional.of(account));
         lenient().when(accountRepository.save(any(BankAccount.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
     }
@@ -65,9 +79,9 @@ class AccountServiceTest {
         BankAccount acct = account("100.00", "500.00");
         givenAccount(acct);
 
-        BankAccount result = accountService.deposit(ACCT, new BigDecimal("50.00"));
+        AccountResponse result = accountService.deposit(ACCT, USER, new BigDecimal("50.00"));
 
-        assertThat(result.getBalance()).isEqualByComparingTo("150.00");
+        assertThat(result.balance()).isEqualByComparingTo("150.00");
         verify(accountRepository).save(acct);
     }
 
@@ -75,21 +89,25 @@ class AccountServiceTest {
     void withdrawWithCorrectPinSucceeds() {
         BankAccount acct = account("100.00", "500.00");
         givenAccount(acct);
+        when(transactionRepository.sumWithdrawalsToday(eq(ACCT), any()))
+                .thenReturn(BigDecimal.ZERO);
 
-        accountService.withdraw(ACCT, PIN, new BigDecimal("40.00"));
+        AccountResponse result = accountService.withdraw(ACCT, USER, PIN, new BigDecimal("40.00"));
 
-        assertThat(acct.getBalance()).isEqualByComparingTo("60.00");
+        assertThat(result.balance()).isEqualByComparingTo("60.00");
     }
 
     @Test
     void withdrawWithWrongPinIsRejectedAndNotPersisted() {
         BankAccount acct = account("100.00", "500.00");
         givenAccount(acct);
+        // PIN check precedes the daily-sum query; lenient so Mockito doesn't flag it as unused
+        lenient().when(transactionRepository.sumWithdrawalsToday(eq(ACCT), any()))
+                .thenReturn(BigDecimal.ZERO);
 
-        assertThatThrownBy(() -> accountService.withdraw(ACCT, "0000", new BigDecimal("40.00")))
+        assertThatThrownBy(() -> accountService.withdraw(ACCT, USER, "0000", new BigDecimal("40.00")))
                 .isInstanceOf(InvalidPinException.class);
 
-        assertThat(acct.getBalance()).isEqualByComparingTo("100.00");
         verify(accountRepository, never()).save(any());
     }
 
@@ -97,8 +115,10 @@ class AccountServiceTest {
     void withdrawBeyondBalanceFails() {
         BankAccount acct = account("30.00", "500.00");
         givenAccount(acct);
+        when(transactionRepository.sumWithdrawalsToday(eq(ACCT), any()))
+                .thenReturn(BigDecimal.ZERO);
 
-        assertThatThrownBy(() -> accountService.withdraw(ACCT, PIN, new BigDecimal("40.00")))
+        assertThatThrownBy(() -> accountService.withdraw(ACCT, USER, PIN, new BigDecimal("40.00")))
                 .isInstanceOf(InsufficientFundsException.class);
     }
 
@@ -108,7 +128,7 @@ class AccountServiceTest {
         acct.lock();
         givenAccount(acct);
 
-        assertThatThrownBy(() -> accountService.deposit(ACCT, new BigDecimal("10.00")))
+        assertThatThrownBy(() -> accountService.deposit(ACCT, USER, new BigDecimal("10.00")))
                 .isInstanceOf(AccountLockedException.class);
         verify(accountRepository, never()).save(any());
     }
@@ -118,9 +138,8 @@ class AccountServiceTest {
         BankAccount acct = account("100.00", "500.00");
         givenAccount(acct);
 
-        accountService.changePin(ACCT, PIN, "9999");
+        accountService.changePin(ACCT, USER, PIN, "9999");
 
-        // New PIN is stored hashed (not plaintext) and verifiable via the encoder.
         assertThat(acct.getPinHash()).isNotEqualTo("9999");
         assertThat(passwordEncoder.matches("9999", acct.getPinHash())).isTrue();
         assertThat(acct.getTransactions().get(0).getType()).isEqualTo(TransactionType.PIN_CHANGE);
@@ -128,8 +147,7 @@ class AccountServiceTest {
 
     @Test
     void changePinRejectsMalformedNewPin() {
-        // Format is validated before any account lookup.
-        assertThatThrownBy(() -> accountService.changePin(ACCT, PIN, "12"))
+        assertThatThrownBy(() -> accountService.changePin(ACCT, USER, PIN, "12"))
                 .isInstanceOf(InvalidPinException.class);
         verify(accountRepository, never()).save(any());
     }

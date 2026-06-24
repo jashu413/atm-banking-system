@@ -11,8 +11,18 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
-
+  flyway:
+    enabled: false   # H2 uses create-drop; Flyway SQL is MySQL-specific
 app:
+  seed-demo-data: false
+  base-url: http://localhost:5173
+  security:
+    max-failed-login-attempts: 3
+    rate-limit:
+      ip-max-attempts: 1000
+      ip-window-seconds: 60
+      username-max-attempts: 1000
+      username-window-seconds: 900
   jwt:
     secret: dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW9ubHktMTIzNDU2Nzg5MA==
     access-token-expiration-ms: 900000

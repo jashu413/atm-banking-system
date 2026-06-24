@@ -1,0 +1,53 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly scan every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+
+jobs:
+  trivy-scan:
+    name: Trivy container vulnerability scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Backend image ──────────────────────────────────────────────────────
+      - name: Build backend image
+        run: docker build -t banking-backend:scan ./backend
+
+      - name: Scan backend image (CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.23.0
+        with:
+          image-ref: banking-backend:scan
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      # ── Frontend image ─────────────────────────────────────────────────────
+      - name: Build frontend image
+        run: docker build -t banking-frontend:scan ./frontend
+
+      - name: Scan frontend image (CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.23.0
+        with:
+          image-ref: banking-frontend:scan
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      # ── Filesystem / dependency scan ───────────────────────────────────────
+      - name: Scan repository filesystem
+        uses: aquasecurity/trivy-action@0.23.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true

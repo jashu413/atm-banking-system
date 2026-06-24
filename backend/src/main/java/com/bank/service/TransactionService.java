@@ -4,6 +4,7 @@ import com.bank.domain.Transaction;
 import com.bank.exception.AccountNotFoundException;
 import com.bank.repository.AccountRepository;
 import com.bank.repository.TransactionRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,8 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 public class TransactionService {
+
+    static final int MAX_MINI_STATEMENT_COUNT = 20;
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
@@ -33,11 +36,15 @@ public class TransactionService {
                 .findByAccount_AccountNumberOrderByCreatedAtDescIdDesc(accountNumber);
     }
 
-    /** The most recent {@code count} transactions for an account. */
+    /**
+     * The most recent {@code count} transactions for an account. The limit is enforced at the
+     * database level via a pageable query to avoid loading the full history into Java memory.
+     */
     public List<Transaction> getMiniStatement(String accountNumber, int count) {
-        return getHistory(accountNumber).stream()
-                .limit(Math.max(count, 0))
-                .toList();
+        ensureAccountExists(accountNumber);
+        int limit = Math.min(Math.max(count, 1), MAX_MINI_STATEMENT_COUNT);
+        return transactionRepository.findRecentByAccountNumber(
+                accountNumber, PageRequest.of(0, limit));
     }
 
     private void ensureAccountExists(String accountNumber) {

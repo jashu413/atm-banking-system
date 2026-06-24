@@ -11,12 +11,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -63,9 +67,10 @@ class TransactionServiceTest {
 
     @Test
     void miniStatementLimitsToRequestedCount() {
-        lenient().when(accountRepository.existsByAccountNumber(ACCT)).thenReturn(true);
-        when(transactionRepository.findByAccount_AccountNumberOrderByCreatedAtDescIdDesc(ACCT))
-                .thenReturn(ledgerNewestFirst());
+        when(accountRepository.existsByAccountNumber(ACCT)).thenReturn(true);
+        List<Transaction> newest2 = ledgerNewestFirst().subList(0, 2);
+        when(transactionRepository.findRecentByAccountNumber(eq(ACCT), any(Pageable.class)))
+                .thenReturn(newest2);
 
         List<Transaction> mini = transactionService.getMiniStatement(ACCT, 2);
 

@@ -1,0 +1,34 @@
+# ── Staging profile ───────────────────────────────────────────────────────────
+# Activate with: SPRING_PROFILES_ACTIVE=staging
+# Mirrors production config but allows demo data and relaxed rate limits.
+# All secrets MUST come from environment variables — no defaults here.
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate   # Never auto-migrate schema in staging/prod
+
+app:
+  seed-demo-data: true       # Keep demo data in staging for QA
+  base-url: ${APP_BASE_URL}
+  security:
+    max-failed-login-attempts: 3
+    rate-limit:
+      ip-max-attempts: 30
+      ip-window-seconds: 60
+      username-max-attempts: 10
+      username-window-seconds: 900
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
+
+logging:
+  level:
+    com.bank: info
+    org.hibernate.SQL: warn

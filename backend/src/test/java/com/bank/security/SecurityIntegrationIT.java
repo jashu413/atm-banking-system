@@ -3,6 +3,10 @@ package com.bank.security;
 import com.bank.domain.Role;
 import com.bank.domain.UserAccount;
 import com.bank.dto.LoginRequest;
+import com.bank.repository.AccountRepository;
+import com.bank.repository.CustomerRepository;
+import com.bank.repository.RefreshTokenRepository;
+import com.bank.repository.TransactionRepository;
 import com.bank.repository.UserAccountRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +41,18 @@ class SecurityIntegrationIT {
     private UserAccountRepository userRepository;
 
     @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
+
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -44,6 +60,11 @@ class SecurityIntegrationIT {
 
     @BeforeEach
     void seedUser() {
+        // Delete in FK-safe order so other IT classes' leftover data doesn't block user deletion
+        refreshTokenRepository.deleteAll();
+        transactionRepository.deleteAll();
+        accountRepository.deleteAll();
+        customerRepository.deleteAll();
         userRepository.deleteAll();
         userRepository.save(new UserAccount("alice",
                 passwordEncoder.encode("Password@123"), Role.CUSTOMER));
